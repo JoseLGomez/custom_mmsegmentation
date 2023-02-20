@@ -1,4 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+# - Added UDA dataset support
 import copy
 import platform
 import random
@@ -68,8 +69,13 @@ def build_dataset(cfg, default_args=None):
     """Build datasets."""
     from .dataset_wrappers import (ConcatDataset, MultiImageMixDataset,
                                    RepeatDataset)
+    from mmseg.datasets import UdaDataset
     if isinstance(cfg, (list, tuple)):
         dataset = ConcatDataset([build_dataset(c, default_args) for c in cfg])
+    elif cfg['type'] == 'UdaDataset':
+        dataset = UdaDataset(
+            source=build_dataset(cfg['source'], default_args),
+            pseudolabels=build_dataset(cfg['pseudolabels'], default_args))
     elif cfg['type'] == 'RepeatDataset':
         dataset = RepeatDataset(
             build_dataset(cfg['dataset'], default_args), cfg['times'])

@@ -19,6 +19,10 @@ from .pascal_context import PascalContextDataset, PascalContextDataset59
 from .potsdam import PotsdamDataset
 from .stare import STAREDataset
 from .voc import PascalVOCDataset
+from .gta import GTADataset
+from .synthia import SynthiaDataset
+from .synscapes import SynscapesDataset
+from .uda_dataset import UdaDataset
 
 __all__ = [
     'CustomDataset', 'build_dataloader', 'ConcatDataset', 'RepeatDataset',
@@ -28,4 +32,5 @@ __all__ = [
     'STAREDataset', 'DarkZurichDataset', 'NightDrivingDataset',
     'COCOStuffDataset', 'LoveDADataset', 'MultiImageMixDataset',
     'iSAIDDataset', 'ISPRSDataset', 'PotsdamDataset', 'FaceOccludedDataset'
+    ,'GTADataset', 'SynthiaDataset','SynscapesDataset','UdaDataset'
 ]

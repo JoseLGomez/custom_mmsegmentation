@@ -1,4 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+# added support for UDA mixbatch
 import warnings
 
 from mmcv.cnn import MODELS as MMCV_MODELS
@@ -45,5 +46,11 @@ def build_segmentor(cfg, train_cfg=None, test_cfg=None):
         'train_cfg specified in both outer field and model field '
     assert cfg.get('test_cfg') is None or test_cfg is None, \
         'test_cfg specified in both outer field and model field '
-    return SEGMENTORS.build(
-        cfg, default_args=dict(train_cfg=train_cfg, test_cfg=test_cfg))
+
+    if 'uda' in cfg and cfg['uda']['mix_batch']:
+        cfg.uda['model'] = cfg.model
+        return SEGMENTORS.build(
+            cfg.uda, default_args=dict(train_cfg=train_cfg, test_cfg=test_cfg))
+    else:
+        return SEGMENTORS.build(
+            cfg, default_args=dict(train_cfg=train_cfg, test_cfg=test_cfg))

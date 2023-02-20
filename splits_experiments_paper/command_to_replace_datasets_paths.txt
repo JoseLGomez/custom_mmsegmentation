@@ -1,0 +1,1 @@
+for i in `ls`; do sed -i 's/old-datasets-paths/new-datasets+paths/g' $i; done

@@ -1,4 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+# - Modified flag from unchanged to grayscale on mmcv.imfrombytes() function
 import os.path as osp
 
 import mmcv
@@ -131,7 +132,7 @@ class LoadAnnotations(object):
             filename = results['ann_info']['seg_map']
         img_bytes = self.file_client.get(filename)
         gt_semantic_seg = mmcv.imfrombytes(
-            img_bytes, flag='unchanged',
+            img_bytes, flag='grayscale',
             backend=self.imdecode_backend).squeeze().astype(np.uint8)
         # modify if custom classes
         if results.get('label_map', None) is not None:

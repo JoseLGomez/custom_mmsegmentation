@@ -1,10 +1,15 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+# - Added support to read annotations from txt files [set mode_txt=True]
+# - added RCS
+
+import json
 import os.path as osp
 import warnings
 from collections import OrderedDict
 
 import mmcv
 import numpy as np
+import torch
 from mmcv.utils import print_log
 from prettytable import PrettyTable
 from torch.utils.data import Dataset
@@ -91,7 +96,9 @@ class CustomDataset(Dataset):
                  classes=None,
                  palette=None,
                  gt_seg_map_loader_cfg=None,
-                 file_client_args=dict(backend='disk')):
+                 mode_txt=False,
+                 file_client_args=dict(backend='disk'),
+                 rare_class_sampling=None):
         self.pipeline = Compose(pipeline)
         self.img_dir = img_dir
         self.img_suffix = img_suffix
@@ -103,6 +110,8 @@ class CustomDataset(Dataset):
         self.ignore_index = ignore_index
         self.reduce_zero_label = reduce_zero_label
         self.label_map = None
+        self.mode_txt = mode_txt
+        self.rare_class_sampling = rare_class_sampling
         self.CLASSES, self.PALETTE = self.get_classes_and_palette(
             classes, palette)
         self.gt_seg_map_loader = LoadAnnotations(
@@ -126,9 +135,46 @@ class CustomDataset(Dataset):
                 self.split = osp.join(self.data_root, self.split)
 
         # load annotations
-        self.img_infos = self.load_annotations(self.img_dir, self.img_suffix,
+        if self.mode_txt:
+            self.img_infos = self.load_annotations_from_file(self.img_dir, self.ann_dir)
+        else:
+            self.img_infos = self.load_annotations(self.img_dir, self.img_suffix,
                                                self.ann_dir,
                                                self.seg_map_suffix, self.split)
+
+        # Prepare RCS if set
+        if self.rare_class_sampling is not None:
+            rcs_cfg = self.rare_class_sampling
+            self.rcs_class_temp = rcs_cfg['class_temp']
+            self.rcs_min_crop_ratio = rcs_cfg['min_crop_ratio']
+            self.rcs_min_pixels = rcs_cfg['min_pixels']
+
+            self.rcs_classes, self.rcs_classprob = get_rcs_class_probs(
+                self.data_root, self.rcs_class_temp)
+            mmcv.print_log(f'RCS Classes: {self.rcs_classes}', 'mmseg')
+            mmcv.print_log(f'RCS ClassProb: {self.rcs_classprob}', 'mmseg')
+
+            with open(
+                    osp.join(self.data_root,
+                             'samples_with_class.json'), 'r') as of:
+                samples_with_class_and_n = json.load(of)
+            samples_with_class_and_n = {
+                int(k): v
+                for k, v in samples_with_class_and_n.items()
+                if int(k) in self.rcs_classes
+            }
+            self.samples_with_class = {}
+            for c in self.rcs_classes:
+                self.samples_with_class[c] = []
+                for file, pixels in samples_with_class_and_n[c]:
+                    if pixels > self.rcs_min_pixels:
+                        self.samples_with_class[c].append(file.split('/')[-1])
+                assert len(self.samples_with_class[c]) > 0
+            self.file_to_idx = {}
+            for i, dic in enumerate(self.img_infos):
+                file = dic['ann']['seg_map']
+                file = file.split('/')[-1]
+                self.file_to_idx[file] = i
 
     def __len__(self):
         """Total number of samples of data."""
@@ -178,6 +224,29 @@ class CustomDataset(Dataset):
         print_log(f'Loaded {len(img_infos)} images', logger=get_root_logger())
         return img_infos
 
+    def load_annotations_from_file(self, img_dir, ann_dir):
+        """Load annotation from file.
+
+        Args:
+            img_dir (str): File with path to images
+            ann_dir (str|None): File with path to annotations
+
+        Returns:
+            list[dict]: All image info of dataset.
+        """
+
+        img_infos = []
+        with open(img_dir,'r') as f:
+            im_list = [line.rstrip().split(' ') for line in f.readlines()]
+        with open(ann_dir,'r') as f:
+            ann_list = [line.rstrip().split(' ') for line in f.readlines()]
+        for idx, im in enumerate(im_list):
+            img_info = dict(filename=im[0])
+            img_info['ann'] = dict(seg_map=ann_list[idx][0])
+            img_infos.append(img_info)
+        print_log(f'Loaded {len(img_infos)} images', logger=get_root_logger())
+        return img_infos
+
     def get_ann_info(self, idx):
         """Get annotation by index.
 
@@ -224,10 +293,12 @@ class CustomDataset(Dataset):
             dict: Training data and annotation after pipeline with new keys
                 introduced by pipeline.
         """
-
-        img_info = self.img_infos[idx]
-        ann_info = self.get_ann_info(idx)
-        results = dict(img_info=img_info, ann_info=ann_info)
+        if self.rare_class_sampling is not None:
+            results = self.get_rare_class_sample()
+        else:
+            img_info = self.img_infos[idx]
+            ann_info = self.get_ann_info(idx)
+            results = dict(img_info=img_info, ann_info=ann_info)
         self.pre_pipeline(results)
         return self.pipeline(results)
 
@@ -485,3 +556,35 @@ class CustomDataset(Dataset):
             })
 
         return eval_results
+
+    def get_rare_class_sample(self):
+        c = np.random.choice(self.rcs_classes, p=self.rcs_classprob)
+        f1 = np.random.choice(self.samples_with_class[c])
+        i1 = self.file_to_idx[f1]
+        img_info = self.img_infos[i1]
+        ann_info = self.get_ann_info(i1)
+        return dict(img_info=img_info, ann_info=ann_info)
+
+def get_rcs_class_probs(data_root, temperature):
+    with open(osp.join(data_root, 'sample_class_stats.json'), 'r') as of:
+        sample_class_stats = json.load(of)
+    overall_class_stats = {}
+    for s in sample_class_stats:
+        s.pop('file')
+        for c, n in s.items():
+            c = int(c)
+            if c not in overall_class_stats:
+                overall_class_stats[c] = n
+            else:
+                overall_class_stats[c] += n
+    overall_class_stats = {
+        k: v
+        for k, v in sorted(
+            overall_class_stats.items(), key=lambda item: item[1])
+    }
+    freq = torch.tensor(list(overall_class_stats.values()))
+    freq = freq / torch.sum(freq)
+    freq = 1 - freq
+    freq = torch.softmax(freq / temperature, dim=-1)
+
+    return list(overall_class_stats.keys()), freq.numpy()
