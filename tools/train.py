@@ -163,7 +163,7 @@ def main():
     cfg.dump(osp.join(cfg.work_dir, osp.basename(args.config)))
     # init the logger before other steps
     timestamp = time.strftime('%Y%m%d_%H%M%S', time.localtime())
-    log_file = osp.join(cfg.work_dir, f'{timestamp}.log')
+    log_file = osp.join(cfg.work_dir, 'experiment.log')
     logger = get_root_logger(log_file=log_file, log_level=cfg.log_level)
 
     # set multi-process settings
