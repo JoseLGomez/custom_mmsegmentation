@@ -8,7 +8,7 @@ _base_ = [
 # runtime settings
 runner = dict(type='IterBasedRunner', max_iters=160000)
 checkpoint_config = dict(by_epoch=False, interval=16000)
-evaluation = dict(interval=16000, metric='mIoU', pre_eval=True)
+evaluation = dict(interval=160000, metric='mIoU', pre_eval=True)
 
 # optimizer
 optimizer = dict(

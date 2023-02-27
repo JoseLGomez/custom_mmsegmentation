@@ -1,22 +1,15 @@
 _base_ = [
-    '../../_base_/models/segformer_mit-b0.py',
-    '../real_datasets/cityscapes_dataset_1024x1024.py',
-    '../../_base_/default_runtime.py', '../../_base_/schedules/schedule_160k.py'
+    '../../../_base_/models/segformer_mit-b0.py',
+    '../single_source_datasets/synscapes_datasets_1024x1024_cityscapes.py',
+    '../../../_base_/default_runtime.py',
+    '../../schedules/schedule_60k.py'
 ]
+
 
 # runtime settings
 runner = dict(type='IterBasedRunner', max_iters=160000)
 checkpoint_config = dict(by_epoch=False, interval=16000)
 evaluation = dict(interval=160000, metric='mIoU', pre_eval=True)
-
-model = dict(
-    backbone=dict(
-        init_cfg=dict(type='Pretrained', checkpoint='https://download.openmmlab.com/mmsegmentation/v0.5/pretrain/segformer/mit_b5_20220624-658746d9.pth'),
-        embed_dims=64,
-        num_layers=[3, 6, 40, 3]),
-    decode_head=dict(in_channels=[64, 128, 320, 512], ignore_index=19, num_classes=20),
-    test_cfg=dict(mode='slide', crop_size=(1024, 1024),
-                  stride=(768, 768)))
 
 # optimizer
 optimizer = dict(
@@ -42,4 +35,13 @@ lr_config = dict(
     min_lr=0.0,
     by_epoch=False)
 
-data = dict(samples_per_gpu=2, workers_per_gpu=4)
+norm_cfg = dict(type='BN', requires_grad=True)
+
+model = dict(
+    backbone=dict(
+        init_cfg=dict(type='Pretrained', checkpoint='https://download.openmmlab.com/mmsegmentation/v0.5/pretrain/segformer/mit_b5_20220624-658746d9.pth'),
+        embed_dims=64,
+        num_layers=[3, 6, 40, 3]),
+    decode_head=dict(in_channels=[64, 128, 320, 512], ignore_index=19, num_classes=20),
+    test_cfg=dict(mode='slide', crop_size=(1024, 1024),
+                  stride=(768, 768)))
