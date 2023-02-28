@@ -14,7 +14,7 @@ model = dict(
         init_cfg=dict(type='Pretrained', checkpoint='https://download.openmmlab.com/mmsegmentation/v0.5/pretrain/segformer/mit_b5_20220624-658746d9.pth'),
         embed_dims=64,
         num_layers=[3, 6, 40, 3]),
-    decode_head=dict(in_channels=[64, 128, 320, 512], ignore_index=19, num_classes=20),
+    decode_head=dict(in_channels=[64, 128, 320, 512], ignore_index=255, num_classes=20),
     test_cfg=dict(mode='slide', crop_size=(1024, 1024),
                   stride=(768, 768)))
 
