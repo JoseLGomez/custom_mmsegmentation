@@ -1,7 +1,8 @@
 _base_ = [
-    '../../_base_/models/segformer_mit-b0.py',
+    '../../../_base_/models/segformer_mit-b0.py',
     '../real_datasets/cityscapes_dataset_1024x1024.py',
-    '../../_base_/default_runtime.py', '../../_base_/schedules/schedule_160k.py'
+    '../../../_base_/default_runtime.py',
+    '../../schedules/schedule_60k.py'
 ]
 
 # runtime settings
